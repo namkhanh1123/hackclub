@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a257b280c212ab440a24e5b4b34a239e, type: 3}
+  m_Name: New Case Data 1
+  m_EditorClassIdentifier: Assembly-CSharp::CaseData
+  studentName: Mika
+  prompt: 'Solve: 5x - 10 = 15'
+  surfaceSolution: x=5
+  isCorrect: 1
+  digLayers:
+  - "Original draft:\r\n5x - 10 = 15  \r\n5x = 5  \r\nx = 1\r\n(The 5 was rewritten
+    over a darker number.)"
+  - 'The ink pressure is uneven.
+
+    The number "25" looks slightly thicker than
+    the rest of the writing.'
+  - 'File metadata:
+
+    Edited 02:41 AM
+
+    Editor ID: Unknown'
+  - 'There is a faint indent on the page.
+
+    As if another answer once existed
+    here.'
+  memoryFragment: 'You do not remember checking submissions at 02:41 AM.
+
+    But
+    the system log shows your account was active.'
+  askLines:
+  - '"I submitted it earlier."'
+  - '"It looked different before."'
+  - '"Does the system ever change answers?"'
