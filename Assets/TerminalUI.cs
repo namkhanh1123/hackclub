@@ -1,119 +1,123 @@
 using TMPro;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class TerminalUI : MonoBehaviour
 {
-    [Header("References")]
-    [SerializeField] private TextMeshProUGUI outputText;
-    [SerializeField] private ScrollRect scrollRect;
-    [SerializeField] private TMP_InputField inputField;
+    [SerializeField] TextMeshProUGUI outputText;
+    [SerializeField] ScrollRect scrollRect;
+    [SerializeField] TMP_InputField inputField;
+    [SerializeField] float bottomPadding = 30f;
+    [SerializeField] float scrollSnap = 0.06f;
 
-    [Header("Scroll")]
-    [SerializeField] private float extraBottomPadding = 30f;
-    [SerializeField] private float autoScrollThreshold = 0.06f; // 0 = bottom, 1 = top
+    [Header("Sound")]
+    [SerializeField] AudioSource typeSfx;
 
-    private System.Action<string> onCommand;
+    System.Action<string> onCommand;
+    RectTransform content, viewport;
 
-    private RectTransform content;
-    private RectTransform viewport;
-
-    private void Awake()
+    void Awake()
     {
-        if (!outputText || !scrollRect || !inputField)
-        {
-            Debug.LogError("TerminalUI: Missing references (outputText/scrollRect/inputField).");
-            enabled = false;
-            return;
-        }
+        if (!outputText || !scrollRect || !inputField) { enabled = false; return; }
 
         content = scrollRect.content;
         viewport = scrollRect.viewport;
+        if (!content || !viewport) { enabled = false; return; }
 
-        if (!content || !viewport)
-        {
-            Debug.LogError("TerminalUI: ScrollRect missing Content/Viewport references.");
-            enabled = false;
-            return;
-        }
-
-        // New Input System compatible
         inputField.onSubmit.AddListener(OnSubmit);
-
-        // Optional: reduce weird motion
         scrollRect.inertia = false;
     }
 
-    private void Start()
+    void Start()
     {
+        if (!typeSfx)
+        {
+            typeSfx = gameObject.AddComponent<AudioSource>();
+            typeSfx.playOnAwake = false;
+            var clip = Resources.Load<AudioClip>("typeclick");
+            if (clip) typeSfx.clip = clip;
+        }
+
         FocusInput();
-        RebuildContentHeight();
-        ScrollToBottomImmediate();
+        Rebuild();
+        SnapBottom();
     }
 
-    public void Bind(System.Action<string> handler) => onCommand = handler;
+    public void Bind(System.Action<string> cb) => onCommand = cb;
 
     public void PrintLine(string line)
     {
-        bool wasNearBottom = IsNearBottom();
-
+        bool snap = NearBottom();
         outputText.text += line + "\n";
-
-        RebuildContentHeight();
-
-        // Only autoscroll if player was already near bottom
-        if (wasNearBottom)
-            ScrollToBottomImmediate();
+        Rebuild();
+        if (snap) SnapBottom();
     }
 
-    private void OnSubmit(string text)
+    public void PrintTransientLine(string line, float dur)
+    {
+        if (dur <= 0f) dur = 0.5f;
+        StartCoroutine(TransientRoutine(line, dur));
+    }
+
+    public void TriggerFlicker(float intensity = 0.08f) { }
+
+    IEnumerator TransientRoutine(string line, float dur)
+    {
+        bool snap = NearBottom();
+        string tagged = $"<color=#8A8A8A>{line}</color><size=1><color=#00000000>{System.Guid.NewGuid()}</color></size>";
+
+        outputText.text += tagged + "\n";
+        Rebuild();
+        if (snap) SnapBottom();
+
+        yield return new WaitForSeconds(dur);
+
+        string needle = tagged + "\n";
+        int idx = outputText.text.IndexOf(needle);
+        if (idx >= 0)
+        {
+            outputText.text = outputText.text.Remove(idx, needle.Length);
+            Rebuild();
+            if (NearBottom()) SnapBottom();
+        }
+    }
+
+    void OnSubmit(string text)
     {
         text = text.Trim();
-        if (string.IsNullOrEmpty(text))
-        {
-            inputField.text = "";
-            FocusInput();
-            return;
-        }
+        if (string.IsNullOrEmpty(text)) { inputField.text = ""; FocusInput(); return; }
 
-        PrintLine("> " + text);
+        if (typeSfx && typeSfx.clip)
+            typeSfx.PlayOneShot(typeSfx.clip, 0.3f);
+
+        bool snap = NearBottom();
+        outputText.text += "> " + text + "\n";
+        Rebuild();
+        if (snap) SnapBottom();
 
         inputField.text = "";
         FocusInput();
-
         onCommand?.Invoke(text);
     }
 
-    private void FocusInput()
+    void FocusInput()
     {
         inputField.ActivateInputField();
         inputField.Select();
     }
 
-    private bool IsNearBottom()
-    {
-        // When at bottom: verticalNormalizedPosition ~ 0
-        return scrollRect.verticalNormalizedPosition <= autoScrollThreshold;
-    }
+    bool NearBottom() => scrollRect.verticalNormalizedPosition <= scrollSnap;
 
-    private void RebuildContentHeight()
+    void Rebuild()
     {
-        // Force TMP to calculate preferredHeight accurately
         outputText.ForceMeshUpdate();
-
-        float targetH = outputText.preferredHeight + extraBottomPadding;
-
-        // Ensure content is always at least slightly taller than viewport,
-        // otherwise ScrollRect may behave like "no scroll"
-        float minH = viewport.rect.height + 1f;
-        if (targetH < minH) targetH = minH;
-
-        content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetH);
-
+        float h = Mathf.Max(outputText.preferredHeight + bottomPadding, viewport.rect.height + 1f);
+        content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, h);
         Canvas.ForceUpdateCanvases();
     }
 
-    private void ScrollToBottomImmediate()
+    void SnapBottom()
     {
         scrollRect.verticalNormalizedPosition = 0f;
         scrollRect.velocity = Vector2.zero;
